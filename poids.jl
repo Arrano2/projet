@@ -118,7 +118,7 @@ function etoile(debut,fin,tab::Matrix{String},poids::Float64)
 end
 
 
-function temps_executionww()
+function temps_execution()
     x=[]
     y=[]
     cpt=0
