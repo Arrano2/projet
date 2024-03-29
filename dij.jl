@@ -2,28 +2,21 @@ function lecture(nom_fichier::String)
     lignes = readlines(nom_fichier)
     nb_lignes = parse(Int, split(lignes[2])[2])  # On prend la deuxième ligne du fichier que l'on ségmente et on prend la deuxième partie ui correspond à la hauteur et on convertit avec parse en int
     nb_colonnes = parse(Int, split(lignes[3])[2]) # Pareil pour la ligne suivante qui correspond à la largeur
-    tab::Matrix{Char} = fill(' ', nb_lignes, nb_colonnes)  # Créer un tableau vide de la bonne taille
+    tab::Matrix{String} = fill(" ", nb_lignes, nb_colonnes)  # Créer un tableau vide de la bonne taille
     
     for i in 1:nb_lignes
         ligne = lignes[i+4]  # Pour ignorer les quatre premières lignes on commence la retranscription à la quatrième ligne
         for j in 1:nb_colonnes
-            tab[i, j] = ligne[j]    # On est sur la i+4 ème ligne et on la parcourt puis on recopie dans le tableau
+            elem=ligne[j]
+            tab[i, j] = string(elem)    # On est sur la i+4 ème ligne et on la parcourt puis on recopie dans le tableau
         end
     end
     
     return tab
 end
 
-function afficher_matrice(matrice)
-    for i in 1:size(matrice, 1)
-        for j in 1:size(matrice, 2)
-            print(matrice[i, j])
-        end
-        println()  # Saut de ligne
-    end
-end
 
-nom_fichier = "arena2.map"
+nom_fichier = "theglaive.map"
 function init()
     return (lecture(nom_fichier))
 end
@@ -33,49 +26,67 @@ function est_valide(p,x,y)
     return(p[1]>0 && p[1]<x+1 && p[2]>0 && p[2]<y+1)
 end
 
-function score(p,v,tab)
+function score(v,tab)
     if tab[v[1],v[2]]=="@"                             #Si le voisin est mur on renvoie la valeur 0 ui est une valeur particulière traitée ailleurs
         return 0
-    elseif tab[p[1],p[2]]=="."                         #Si le point de départ est un point 
-        if tab[v[1],v[2]]=="."                         #Si le point d'arrivée en est un aussi on renvoie 1
-            return 1
-        else                                           #Si le point d'arrivée est quoi que ce soit d'autres on renvoie 3
-            return 3
-        end
-    else                                               #Si le point de départ est quoi que ce soit d'autres qu'un point
-        if tab[v[1],v[2]]=="."                         #Si le voisin est un point on renvoie 3
-            return 1
-        else                                           #Si ce voisin et aussi une case dur à franchir on renvoie 5
-            return 5
-        end
+    elseif tab[v[1],v[2]]=="S"                         
+        return 5
+    elseif tab[v[1],v[2]]=="W"
+        return 8
+    else 
+        return 1
     end
 end
 
-function avancer(parent,cout,l,tab)
+function min(l::Vector{Tuple{Tuple{Int, Int}, Int}})
+	i=1
+	elem=l[1]	
+	for k in 1:length(l)
+		if l[k][2]<elem[2]
+			elem=l[k]
+			i=k
+		end
+	end
+	return(elem,i)
+end
+
+
+function avancer(parent,cout,tmp::Tuple{Tuple{Int, Int}, Int},tab::Matrix{String})
     nb_lignes, nb_colonnes = size(tab)
-    p=l[1][1]
+    l=[]
+    p=tmp[1]
+    cpt=0
     voisins = [(p[1]+1, p[2]), (p[1]-1, p[2]), (p[1], p[2]+1), (p[1], p[2]-1)]
     for i in voisins                                                            #On parcourt la liste des voisins du premier point de la liste
-        if est_valide(i, nb_lignes,nb_colonnes)   &&  score(p,i,tab)>0        #Si il est valide et que ce n'est pas un mur
-            poids=l[1][2]+score(p,i,tab)                                        #Le poids du voisin, par ce chemin, a pour valeur le poids pour atteindre le point p plus celui entre p et lui même
+        if est_valide(i, nb_lignes,nb_colonnes)   &&  score(i,tab)>0        #Si il est valide et que ce n'est pas un mur
+            poids=tmp[2]+score(i,tab)                                        #Le poids du voisin, par ce chemin, a pour valeur le poids pour atteindre le point p plus celui entre p et lui même
             if cout[i[1],i[2]]==-1 || cout[i[1],i[2]]>poids                      #Si le cout pour atteindre i n'a pas de valeur ou u'il a une valeur plus grande 
                 cout[i[1],i[2]]=poids                                           #On change cette valeur pour qu'elle soit la plus petite
                 push!(l,(i,poids))                                              #On ajoute le tuple (i,poids) dans l pour continuer de traiter ce chemin, à noter que si le point i est atteint par un meilleur chemin, ce chemin moins optimal meurt dans les if précédent
                 parent[i[1],i[2]]=p                                             #Enfin on donne à i son parent, ici p
+                cpt+=1
             end
         end
     end
+    return l,cpt
 end
     
-function dijkstra(debut,fin,tab)
+function dijkstra(debut,fin,tab::Matrix{String})
     nb_lignes, nb_colonnes = size(tab)
     parent::Matrix{Tuple{Int64,Int64}} = fill((-1,-1), nb_lignes, nb_colonnes)      #On initialise une matrice parent avec pour valeur par défaut (-1,-1)
     cout::Matrix{Int64} = fill(-1, nb_lignes, nb_colonnes)                          #On initialise une matrice cout avec pour valeur par défaut -1
     l::Vector{Tuple{Tuple{Int, Int}, Int}}=[(debut,0)]                              #On initialise une liste avec pour valeur [(debut,0)] cette lite va contenir des Tuples de point,valeur la valeur représente le cout u'il nous a fallu pour atteindre ce point(présent dans la matrice cout)
-    cout[debut[1],debut[2]]=0                                                                   #On initialise le cout pour atteindre le debut à 0 afin de ne pas repasser par ce point
-    while parent[fin[1],fin[2]]==(-1,-1) || l!=[]                                             #Tant que notre objectif n'a pas de parent ou ue la liste l n'est pas vide (cas ou on ne peut pas atteindre le point final)
-        avancer(parent,cout,l,tab)
-        popfirst!(l)                                                                #On supprime le premier élément de l ce qui nous permet de n'avoir que des éléments non traités dans l
+    cout[debut[1],debut[2]]=0  
+    cpt=1                                                                 #On initialise le cout pour atteindre le debut à 0 afin de ne pas repasser par ce point
+    while parent[fin[1],fin[2]]==(-1,-1) && l!=[]                                             #Tant que notre objectif n'a pas de parent ou ue la liste l n'est pas vide (cas ou on ne peut pas atteindre le point final)
+        suppr=min(l)
+        tmp=suppr[1]
+        av=avancer(parent,cout,tmp,tab)
+        add=av[1]
+        cpt=cpt+av[2]
+        append!(l,add)
+        deleteat!(l,suppr[2])                                                               #On supprime le premier élément de l ce qui nous permet de n'avoir que des éléments non traités dans l
+        
     end
     chemin=[fin]
     i=fin    
@@ -83,14 +94,21 @@ function dijkstra(debut,fin,tab)
         i=parent[i[1],i[2]]
         push!(chemin,i)
     end
+    println("Distance entre les deux points:",cout[fin[1],fin[2]] )
+    println("Points visités",cpt )
     return(reverse(chemin))
 end
 
-function test2()
+function testdij()
     tab=init()
-    dijkstra((100,5), (201,277),tab)
+    dijkstra((189,193), (226,437),tab)
 end
 
-#refaire une liste qui joue le role de dico[debut] cad une liste qui stocke les points à parcourir
-#conserver le dictionnaire pour les poids des délacements
-#une matrice parent et une cout qui stockent les parents de chaques points et le cout qu'il a fallut pour y arriver depuis début
+function temps_executiond()
+    debut = time_ns()
+    testdij()
+    fin = time_ns()
+    temps_execution=(fin - debut) / 1e9
+    println("Temps d'exécution: ", temps_execution, " secondes")
+end
+
